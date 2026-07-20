@@ -1,3 +1,8 @@
+// ==========================================================================
+// CENTRAL BACKEND CONFIGURATION
+// ==========================================================================
+const BACKEND_URL = "https://chatapplication-backend-kh2m.onrender.com";
+
 let stompClient = null;
 let currentUser = null;
 let currentChannel = 'general';
@@ -93,13 +98,13 @@ function handleAuthSubmit(event) {
     let payload = {};
 
     if (currentAuthMode === 'login') {
-        endpoint = 'http://localhost:8081/api/auth/login';
+        endpoint = `${BACKEND_URL}/api/auth/login`;
         payload = { username, password };
     } else if (currentAuthMode === 'register') {
-        endpoint = 'http://localhost:8081/api/auth/register';
+        endpoint = `${BACKEND_URL}/api/auth/register`;
         payload = { username, email, password };
     } else if (currentAuthMode === 'forgot') {
-        endpoint = 'http://localhost:8081/api/auth/reset-password';
+        endpoint = `${BACKEND_URL}/api/auth/reset-password`;
         payload = { username, newPassword };
     }
 
@@ -147,7 +152,7 @@ function showChatApp() {
 }
 
 function connectWebSocket() {
-    const socket = new SockJS('http://localhost:8081/ws');
+    const socket = new SockJS(`${BACKEND_URL}/ws`);
     stompClient = Stomp.over(socket);
 
     stompClient.connect({}, () => {
@@ -172,7 +177,7 @@ function selectConversation(channelName, subtext, isGroup = false) {
     });
 
     // Fetch message history from backend DB
-    fetch(`http://localhost:8081/api/messages/${currentChannel}`)
+    fetch(`${BACKEND_URL}/api/messages/${currentChannel}`)
         .then(res => res.json())
         .then(messages => {
             messages.forEach(msg => renderMessage(msg));
@@ -296,7 +301,7 @@ function uploadFile(event) {
     const formData = new FormData();
     formData.append("file", file);
 
-    fetch('http://localhost:8081/api/upload', {
+    fetch(`${BACKEND_URL}/api/upload`, {
         method: 'POST',
         body: formData
     })
@@ -305,11 +310,11 @@ function uploadFile(event) {
         return res.json();
     })
     .then(data => {
-        // Construct absolute server URL so Live Server can load images from Spring Boot
+        // Construct absolute server URL from Render backend
         let rawUrl = data.fileUrl || data.fileName || '';
         let fullUrl = rawUrl.startsWith('http') 
             ? rawUrl 
-            : `http://localhost:8081/uploads/${rawUrl.replace(/^\/?uploads\//, '')}`;
+            : `${BACKEND_URL}/uploads/${rawUrl.replace(/^\/?uploads\//, '')}`;
 
         const isImage = file.type.startsWith('image/');
         const content = isImage 
@@ -328,7 +333,7 @@ function uploadFile(event) {
     })
     .catch(err => {
         console.error("File upload error:", err);
-        alert("Failed to upload file. Ensure Spring Boot backend is running!");
+        alert("Failed to upload file. Ensure backend service is active!");
     });
 }
 
@@ -356,7 +361,7 @@ function showTypingIndicator(sender) {
 }
 
 function loadPeopleDirectory() {
-    fetch('http://localhost:8081/api/users')
+    fetch(`${BACKEND_URL}/api/users`)
         .then(res => res.json())
         .then(users => {
             const container = document.getElementById('peopleListArea');
