@@ -200,13 +200,21 @@ function handleIncomingMessage(message) {
     scrollToBottom();
 }
 
+/* Helper to convert legacy localhost links to live Render backend links */
+function formatMessageContent(content) {
+    if (!content) return '';
+    return content.replace(/http:\/\/localhost:8081/g, BACKEND_URL);
+}
+
 function renderMessage(message) {
     if (!message) return;
 
     const isSelf = message.sender === currentUser.username;
     const isDeleted = message.deleted;
 
-    let messageContent = message.content || '';
+    let rawContent = message.content || '';
+    let messageContent = formatMessageContent(rawContent);
+
     if (isDeleted) {
         messageContent = '<i>This message was deleted</i>';
     } else if (message.edited) {
@@ -215,7 +223,7 @@ function renderMessage(message) {
 
     let actionButtons = '';
     if (isSelf && !isDeleted) {
-        const safeContent = escapeQuotes(message.content || '');
+        const safeContent = escapeQuotes(rawContent);
         actionButtons = `
             <div class="message-actions">
                 <button title="Edit" onclick="promptEditMessage(${message.id}, '${safeContent}')"><i class="fa-solid fa-pen"></i></button>
@@ -248,7 +256,8 @@ function updateExistingMessageNode(element, message) {
         const actions = element.querySelector('.message-actions');
         if (actions) actions.remove();
     } else if (message.edited) {
-        bubbleContent.innerHTML = `${message.content} <span class="edited-badge">(edited)</span>`;
+        let content = formatMessageContent(message.content);
+        bubbleContent.innerHTML = `${content} <span class="edited-badge">(edited)</span>`;
     }
 }
 
@@ -291,7 +300,7 @@ function confirmDeleteMessage(id) {
 }
 
 /* ==========================================================================
-   3. FIXED FILE & IMAGE UPLOAD ENGINE
+   3. FILE & IMAGE UPLOAD ENGINE
    ========================================================================== */
 
 function uploadFile(event) {
@@ -310,11 +319,10 @@ function uploadFile(event) {
         return res.json();
     })
     .then(data => {
-        // Construct absolute server URL from Render backend
+        // Strip host and leading path to construct clean Render backend URL
         let rawUrl = data.fileUrl || data.fileName || '';
-        let fullUrl = rawUrl.startsWith('http') 
-            ? rawUrl 
-            : `${BACKEND_URL}/uploads/${rawUrl.replace(/^\/?uploads\//, '')}`;
+        let cleanPath = rawUrl.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/?uploads\//, '');
+        let fullUrl = `${BACKEND_URL}/uploads/${cleanPath}`;
 
         const isImage = file.type.startsWith('image/');
         const content = isImage 
@@ -328,7 +336,6 @@ function uploadFile(event) {
             type: 'CHAT'
         }));
 
-        // Reset file input value so user can upload same file again
         event.target.value = '';
     })
     .catch(err => {
