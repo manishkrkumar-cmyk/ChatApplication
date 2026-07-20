@@ -7,11 +7,15 @@
     font-family: 'Plus Jakarta Sans', sans-serif; 
 }
 
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
 body { 
     background: #090d16; 
-    min-height: 100vh; 
     color: #1e293b; 
-    overflow-x: hidden; 
 }
 
 .hidden { 
@@ -26,6 +30,7 @@ body {
     min-height: 100vh; 
     background: radial-gradient(circle at top, #1e1b4b 0%, #090d16 80%); 
     color: white; 
+    overflow-y: auto;
 }
 
 .navbar { 
@@ -88,7 +93,7 @@ body {
     line-height: 1.2; 
     margin-bottom: 16px; 
     background: linear-gradient(135deg, #ffffff, #38bdf8); 
-    background-clip: text; 
+    background-clip: text;
     -webkit-background-clip: text; 
     -webkit-text-fill-color: transparent; 
 }
@@ -174,6 +179,10 @@ body {
     justify-content: center; 
     align-items: center; 
     z-index: 1000; 
+}
+
+.modal-overlay.hidden {
+    display: none !important;
 }
 
 .auth-card { 
@@ -313,7 +322,7 @@ body {
 
 
 /* ==========================================================================
-   2. CHAT PAGE 3-COLUMN LIGHT DASHBOARD
+   2. CHAT PAGE 3-COLUMN LIGHT DASHBOARD (Strict Flex Layout Fix)
    ========================================================================== */
 
 #chat-page { 
@@ -329,6 +338,7 @@ body {
     height: 100vh; 
     width: 100vw; 
     background: #ffffff; 
+    overflow: hidden;
 }
 
 /* LEFT SIDEBAR */
@@ -338,6 +348,8 @@ body {
     padding: 24px; 
     display: flex; 
     flex-direction: column; 
+    height: 100vh;
+    overflow: hidden;
 }
 
 .my-account-card { 
@@ -346,6 +358,7 @@ body {
     gap: 14px; 
     padding-bottom: 24px; 
     border-bottom: 1px solid #e2e8f0; 
+    flex-shrink: 0;
 }
 
 .avatar-large { 
@@ -379,6 +392,7 @@ body {
 .conversations-section { 
     flex: 1; 
     margin-top: 24px; 
+    overflow-y: auto;
 }
 
 .section-heading { 
@@ -458,6 +472,7 @@ body {
     justify-content: center; 
     gap: 8px; 
     transition: 0.2s;
+    flex-shrink: 0;
 }
 
 .logout-btn-light:hover {
@@ -471,6 +486,8 @@ body {
     flex-direction: column; 
     background: #ffffff; 
     border-right: 1px solid #e2e8f0; 
+    height: 100vh;
+    overflow: hidden;
 }
 
 .active-chat-header { 
@@ -478,6 +495,7 @@ body {
     border-bottom: 1px solid #f1f5f9; 
     display: flex; 
     justify-content: center; 
+    flex-shrink: 0;
 }
 
 .target-user-badge { 
@@ -514,6 +532,7 @@ body {
     display: flex; 
     flex-direction: column; 
     max-width: 60%; 
+    position: relative;
 }
 
 .message-item.self { 
@@ -551,6 +570,16 @@ body {
     word-break: break-word; 
 }
 
+/* Image constraints inside message bubbles */
+.message-bubble img {
+    max-width: 260px;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 12px;
+    margin-top: 8px;
+    display: block;
+}
+
 .message-item.self .message-bubble { 
     background: #2563eb; 
     color: white; 
@@ -561,6 +590,56 @@ body {
     background: #f1f5f9; 
     color: #0f172a; 
     border-bottom-left-radius: 4px; 
+}
+
+/* EDIT AND DELETE HOVER MENU */
+.message-actions {
+    display: none;
+    position: absolute;
+    top: -12px;
+    right: 10px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 2px 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10;
+}
+
+.message-item.self .message-actions {
+    right: 10px;
+    left: auto;
+}
+
+.message-item.other .message-actions {
+    left: 10px;
+    right: auto;
+}
+
+.message-item:hover .message-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.message-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    opacity: 0.7;
+    transition: 0.2s;
+}
+
+.message-actions button:hover {
+    opacity: 1;
+    transform: scale(1.15);
+}
+
+.edited-badge {
+    font-size: 10px;
+    opacity: 0.7;
+    font-style: italic;
+    margin-left: 4px;
 }
 
 .time-stamp { 
@@ -578,6 +657,7 @@ body {
     gap: 8px; 
     font-size: 12px; 
     color: #2563eb; 
+    flex-shrink: 0;
 }
 
 .dots { 
@@ -601,6 +681,8 @@ body {
 .chat-input-bar { 
     padding: 20px 32px; 
     border-top: 1px solid #f1f5f9; 
+    background: #ffffff;
+    flex-shrink: 0;
 }
 
 #messageForm { 
@@ -647,6 +729,7 @@ body {
     background: #ffffff; 
     padding: 24px; 
     overflow-y: auto; 
+    height: 100vh;
 }
 
 .people-list { 

@@ -1,8 +1,6 @@
 package com.example.chat.model;
 
 import jakarta.persistence.*;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 
 @Entity
 @Table(name = "chat_messages")
@@ -17,19 +15,28 @@ public class ChatMessage {
     @Column(length = 2000)
     private String content;
 
+    private String channel;
+    private String time;
+
     @Enumerated(EnumType.STRING)
     private MessageType type;
 
-    private String channel = "general"; // Default channel
-    private String fileUrl; // Stores path if an image/file is uploaded
-    private String timestamp;
+    private boolean edited = false;
+    private boolean deleted = false;
 
     public enum MessageType {
         CHAT, JOIN, LEAVE, TYPING
     }
 
     public ChatMessage() {
-        this.timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+    }
+
+    public ChatMessage(String sender, String content, String channel, MessageType type, String time) {
+        this.sender = sender;
+        this.content = content;
+        this.channel = channel;
+        this.type = type;
+        this.time = time;
     }
 
     // Getters and Setters
@@ -57,14 +64,6 @@ public class ChatMessage {
         this.content = content;
     }
 
-    public MessageType getType() {
-        return type;
-    }
-
-    public void setType(MessageType type) {
-        this.type = type;
-    }
-
     public String getChannel() {
         return channel;
     }
@@ -73,19 +72,35 @@ public class ChatMessage {
         this.channel = channel;
     }
 
-    public String getFileUrl() {
-        return fileUrl;
+    public String getTime() {
+        return time;
     }
 
-    public void setFileUrl(String fileUrl) {
-        this.fileUrl = fileUrl;
+    public void setTime(String time) {
+        this.time = time;
     }
 
-    public String getTimestamp() {
-        return timestamp;
+    public MessageType getType() {
+        return type;
     }
 
-    public void setTimestamp(String timestamp) {
-        this.timestamp = timestamp;
+    public void setType(MessageType type) {
+        this.type = type;
+    }
+
+    public boolean isEdited() {
+        return edited;
+    }
+
+    public void setEdited(boolean edited) {
+        this.edited = edited;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
     }
 }

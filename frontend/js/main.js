@@ -1,299 +1,395 @@
 let stompClient = null;
-let username = null;
-let userEmail = null;
-let currentTarget = 'general';
-let activeChannelKey = 'general';
-let isGroup = true;
-let currentSubscription = null;
+let currentUser = null;
+let currentChannel = 'general';
 let currentAuthMode = 'login';
 let typingTimeout = null;
 
-// --- AUTO-LOGIN CHECK ON PAGE REFRESH ---
-
-window.addEventListener('DOMContentLoaded', () => {
-    const savedUser = localStorage.getItem('chat_username');
-    const savedEmail = localStorage.getItem('chat_email');
-    if (savedUser) {
-        username = savedUser;
-        userEmail = savedEmail || `${savedUser}@chat.com`;
-        enterChat();
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    checkActiveSession();
 });
 
-// --- MODAL & AUTHENTICATION HANDLERS ---
+/* ==========================================================================
+   1. AUTHENTICATION & MODAL HANDLERS
+   ========================================================================== */
 
-function openAuthModal(mode) {
-    document.querySelector('#auth-modal').classList.remove('hidden');
-    switchAuthTab(mode);
+function checkActiveSession() {
+    const savedUser = localStorage.getItem('pulse_workspace_user');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        showChatApp();
+    }
+}
+
+function openAuthModal(mode = 'login') {
+    const modal = document.getElementById('auth-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        switchAuthTab(mode);
+    }
 }
 
 function closeAuthModal() {
-    document.querySelector('#auth-modal').classList.add('hidden');
-    hideAlert();
+    const modal = document.getElementById('auth-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        clearAuthErrors();
+    }
 }
 
 function switchAuthTab(mode) {
     currentAuthMode = mode;
-    hideAlert();
+    clearAuthErrors();
 
-    document.querySelector('#tab-login').classList.toggle('active', mode === 'login');
-    document.querySelector('#tab-register').classList.toggle('active', mode === 'register');
-    document.querySelector('#tab-forgot').classList.toggle('active', mode === 'forgot');
+    // Active tab button styling
+    const tabLogin = document.getElementById('tab-login');
+    const tabRegister = document.getElementById('tab-register');
+    const tabForgot = document.getElementById('tab-forgot');
 
-    const emailGroup = document.querySelector('#email-group');
-    const passGroup = document.querySelector('#password-group');
-    const newPassGroup = document.querySelector('#new-password-group');
-    const submitBtn = document.querySelector('#auth-submit-btn span');
+    if (tabLogin) tabLogin.classList.toggle('active', mode === 'login');
+    if (tabRegister) tabRegister.classList.toggle('active', mode === 'register');
+    if (tabForgot) tabForgot.classList.toggle('active', mode === 'forgot');
 
-    if (mode === 'register') {
-        emailGroup.classList.remove('hidden');
-        passGroup.classList.remove('hidden');
-        newPassGroup.classList.add('hidden');
-        submitBtn.textContent = 'Create Account';
+    // Toggle input field visibility
+    document.getElementById('email-group').classList.toggle('hidden', mode !== 'register');
+    document.getElementById('password-group').classList.toggle('hidden', mode === 'forgot');
+    document.getElementById('new-password-group').classList.toggle('hidden', mode !== 'forgot');
+
+    // Modal title and button updates
+    const title = document.getElementById('modal-title');
+    const subtitle = document.getElementById('modal-subtitle');
+    const submitBtn = document.getElementById('auth-submit-btn');
+
+    if (mode === 'login') {
+        title.textContent = "Welcome Back";
+        subtitle.textContent = "Log in to enter Pulse Workspace";
+        submitBtn.innerHTML = `<span>Sign In</span> <i class="fa-solid fa-arrow-right"></i>`;
+    } else if (mode === 'register') {
+        title.textContent = "Create Account";
+        subtitle.textContent = "Register to join the workspace";
+        submitBtn.innerHTML = `<span>Register</span> <i class="fa-solid fa-user-plus"></i>`;
     } else if (mode === 'forgot') {
-        emailGroup.classList.add('hidden');
-        passGroup.classList.add('hidden');
-        newPassGroup.classList.remove('hidden');
-        submitBtn.textContent = 'Update Password';
-    } else {
-        emailGroup.classList.add('hidden');
-        passGroup.classList.remove('hidden');
-        newPassGroup.classList.add('hidden');
-        submitBtn.textContent = 'Sign In';
+        title.textContent = "Reset Password";
+        subtitle.textContent = "Enter details to reset your password";
+        submitBtn.innerHTML = `<span>Reset Password</span> <i class="fa-solid fa-key"></i>`;
     }
 }
 
-function showAlert(message, isError = true) {
-    const banner = document.querySelector('#auth-error');
-    banner.textContent = message;
-    banner.className = `alert-banner ${isError ? 'error' : 'success'}`;
-    banner.classList.remove('hidden');
-}
-
-function hideAlert() {
-    document.querySelector('#auth-error').classList.add('hidden');
+function clearAuthErrors() {
+    const errorBox = document.getElementById('auth-error');
+    if (errorBox) {
+        errorBox.innerHTML = '';
+        errorBox.classList.add('hidden');
+    }
 }
 
 function handleAuthSubmit(event) {
     event.preventDefault();
-    hideAlert();
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const newPassword = document.getElementById('newPassword').value;
 
-    const u = document.querySelector('#username').value.trim();
-    const p = document.querySelector('#password').value;
-    const np = document.querySelector('#newPassword').value;
-    const e = document.querySelector('#email').value.trim();
+    let endpoint = '';
+    let payload = {};
 
-    let endpoint = '/api/auth/login';
-    let payload = { username: u, password: p };
-
-    if (currentAuthMode === 'register') {
-        endpoint = '/api/auth/register';
-        payload = { username: u, password: p, email: e };
+    if (currentAuthMode === 'login') {
+        endpoint = 'http://localhost:8081/api/auth/login';
+        payload = { username, password };
+    } else if (currentAuthMode === 'register') {
+        endpoint = 'http://localhost:8081/api/auth/register';
+        payload = { username, email, password };
     } else if (currentAuthMode === 'forgot') {
-        endpoint = '/api/auth/forgot-password';
-        payload = { username: u, newPassword: np };
+        endpoint = 'http://localhost:8081/api/auth/reset-password';
+        payload = { username, newPassword };
     }
 
-    fetch(`http://localhost:8081${endpoint}`, {
+    fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     })
-    .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Authentication failed');
-        return data;
+    .then(res => {
+        if (!res.ok) throw new Error("Authentication failed");
+        return res.json();
     })
     .then(data => {
-        if (currentAuthMode === 'register' || currentAuthMode === 'forgot') {
-            showAlert(data.message, false);
-            setTimeout(() => switchAuthTab('login'), 1200);
+        if (currentAuthMode === 'forgot') {
+            alert("Password reset successfully! Please sign in.");
+            switchAuthTab('login');
         } else {
-            username = u;
-            userEmail = data.email || `${u}@chat.com`;
-            localStorage.setItem('chat_username', username);
-            localStorage.setItem('chat_email', userEmail);
+            currentUser = { username: data.username || username, email: data.email || email };
+            localStorage.setItem('pulse_workspace_user', JSON.stringify(currentUser));
             closeAuthModal();
-            enterChat();
+            showChatApp();
         }
     })
-    .catch(err => showAlert(err.message, true));
+    .catch(err => {
+        const errorBox = document.getElementById('auth-error');
+        errorBox.textContent = err.message || "Invalid input or credentials.";
+        errorBox.classList.remove('hidden');
+    });
 }
 
-// --- ENTER CHAT & WEBSOCKET SETUP ---
+/* ==========================================================================
+   2. CHAT APP DASHBOARD & WEBSOCKET ENGINE
+   ========================================================================== */
 
-function enterChat() {
-    document.querySelector('#home-page').classList.add('hidden');
-    document.querySelector('#chat-page').classList.remove('hidden');
+function showChatApp() {
+    document.getElementById('home-page').classList.add('hidden');
+    document.getElementById('chat-page').classList.remove('hidden');
 
-    document.querySelector('#current-username').textContent = username;
-    document.querySelector('#current-user-email').textContent = userEmail;
-    document.querySelector('#current-user-avatar').textContent = username.charAt(0).toUpperCase();
+    document.getElementById('current-username').textContent = currentUser.username;
+    document.getElementById('current-user-email').textContent = currentUser.email || '';
+    document.getElementById('current-user-avatar').textContent = currentUser.username.charAt(0).toUpperCase();
 
-    fetchPeopleList();
+    connectWebSocket();
+    loadPeopleDirectory();
+}
 
+function connectWebSocket() {
     const socket = new SockJS('http://localhost:8081/ws');
     stompClient = Stomp.over(socket);
-    stompClient.debug = null;
 
-    stompClient.connect({}, () => subscribeToChannel('general'), err => console.error("WebSocket Error:", err));
+    stompClient.connect({}, () => {
+        selectConversation(currentChannel, 'Public Group Workspace', true);
+    }, (error) => {
+        console.error('WebSocket connection error:', error);
+    });
 }
 
-function fetchPeopleList() {
-    fetch('http://localhost:8081/api/auth/users')
-        .then(res => res.json())
-        .then(users => {
-            const listArea = document.querySelector('#peopleListArea');
-            listArea.innerHTML = '';
+function selectConversation(channelName, subtext, isGroup = false) {
+    currentChannel = channelName;
 
-            users.forEach(u => {
-                if (u.username !== username) {
-                    const item = document.createElement('div');
-                    item.className = 'people-item';
-                    item.onclick = () => selectConversation(u.username, u.email || `${u.username}@chat.com`, false);
-                    item.innerHTML = `
-                        <div class="avatar-medium">${u.username.charAt(0).toUpperCase()}</div>
-                        <div class="people-info">
-                            <h4>${u.username}</h4>
-                            <p>${u.email || `${u.username}@chat.com`}</p>
-                        </div>
-                    `;
-                    listArea.appendChild(item);
-                }
-            });
-        });
-}
+    document.getElementById('target-username').textContent = isGroup ? `# ${channelName}` : channelName;
+    document.getElementById('target-email').textContent = subtext;
+    document.getElementById('target-avatar').textContent = isGroup ? '#' : channelName.charAt(0).toUpperCase();
+    document.getElementById('messageArea').innerHTML = '';
 
-function selectConversation(targetName, subText, group = true) {
-    currentTarget = targetName;
-    isGroup = group;
+    // STOMP Topic subscription
+    stompClient.subscribe(`/topic/${currentChannel}`, (payload) => {
+        const message = JSON.parse(payload.body);
+        handleIncomingMessage(message);
+    });
 
-    document.querySelector('#target-username').textContent = targetName;
-    document.querySelector('#target-email').textContent = subText;
-    document.querySelector('#target-avatar').textContent = group ? '#' : targetName.charAt(0).toUpperCase();
-    document.querySelector('#messageArea').innerHTML = '';
-
-    if (group) {
-        activeChannelKey = targetName;
-    } else {
-        const sorted = [username, targetName].sort();
-        activeChannelKey = `${sorted[0]}_${sorted[1]}`;
-    }
-
-    subscribeToChannel(activeChannelKey);
-}
-
-function subscribeToChannel(channelKey) {
-    if (currentSubscription) currentSubscription.unsubscribe();
-
-    currentSubscription = stompClient.subscribe(`/topic/${channelKey}`, onMessageReceived);
-    stompClient.send(`/app/chat.addUser/${channelKey}`, {}, JSON.stringify({ sender: username, type: 'JOIN' }));
-
-    loadHistory(channelKey);
-}
-
-function loadHistory(channelKey) {
-    fetch(`http://localhost:8081/api/messages/${channelKey}`)
+    // Fetch message history from backend DB
+    fetch(`http://localhost:8081/api/messages/${currentChannel}`)
         .then(res => res.json())
         .then(messages => {
-            document.querySelector('#messageArea').innerHTML = '';
             messages.forEach(msg => renderMessage(msg));
+            scrollToBottom();
         });
 }
 
-function emitTyping() {
-    if (stompClient) {
-        stompClient.send(`/app/chat.sendMessage/${activeChannelKey}`, {}, JSON.stringify({ sender: username, type: 'TYPING' }));
+function handleIncomingMessage(message) {
+    if (message.type === 'TYPING') {
+        showTypingIndicator(message.sender);
+        return;
+    }
+
+    const existingMsgEl = document.getElementById(`msg-${message.id}`);
+    if (existingMsgEl) {
+        updateExistingMessageNode(existingMsgEl, message);
+    } else {
+        renderMessage(message);
+    }
+    scrollToBottom();
+}
+
+function renderMessage(message) {
+    if (!message) return;
+
+    const isSelf = message.sender === currentUser.username;
+    const isDeleted = message.deleted;
+
+    let messageContent = message.content || '';
+    if (isDeleted) {
+        messageContent = '<i>This message was deleted</i>';
+    } else if (message.edited) {
+        messageContent += ' <span class="edited-badge">(edited)</span>';
+    }
+
+    let actionButtons = '';
+    if (isSelf && !isDeleted) {
+        const safeContent = escapeQuotes(message.content || '');
+        actionButtons = `
+            <div class="message-actions">
+                <button title="Edit" onclick="promptEditMessage(${message.id}, '${safeContent}')"><i class="fa-solid fa-pen"></i></button>
+                <button title="Delete" onclick="confirmDeleteMessage(${message.id})"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        `;
+    }
+
+    const html = `
+        <li class="message-item ${isSelf ? 'self' : 'other'}" id="msg-${message.id}">
+            <span class="sender-name">${message.sender}</span>
+            <div class="message-bubble">
+                <div class="bubble-content">${messageContent}</div>
+                <span class="time-stamp">${message.time || ''}</span>
+            </div>
+            ${actionButtons}
+        </li>
+    `;
+
+    const messageArea = document.getElementById('messageArea');
+    if (messageArea) {
+        messageArea.insertAdjacentHTML('beforeend', html);
+    }
+}
+
+function updateExistingMessageNode(element, message) {
+    const bubbleContent = element.querySelector('.bubble-content');
+    if (message.deleted) {
+        bubbleContent.innerHTML = '<i>This message was deleted</i>';
+        const actions = element.querySelector('.message-actions');
+        if (actions) actions.remove();
+    } else if (message.edited) {
+        bubbleContent.innerHTML = `${message.content} <span class="edited-badge">(edited)</span>`;
     }
 }
 
 function sendMessage(event) {
-    event.preventDefault();
-    const input = document.querySelector('#message');
-    const content = input.value.trim();
+    if (event) event.preventDefault();
+    
+    const input = document.getElementById('message');
+    const text = input.value.trim();
 
-    if (content && stompClient) {
-        stompClient.send(`/app/chat.sendMessage/${activeChannelKey}`, {}, JSON.stringify({
-            sender: username,
-            content: content,
+    if (text && stompClient) {
+        const chatMessage = {
+            sender: currentUser.username,
+            content: text,
+            channel: currentChannel,
             type: 'CHAT'
-        }));
+        };
+        stompClient.send('/app/chat.sendMessage', {}, JSON.stringify(chatMessage));
         input.value = '';
     }
 }
+
+function promptEditMessage(id, oldContent) {
+    const newText = prompt("Edit your message:", oldContent);
+    if (newText !== null && newText.trim() !== "" && newText !== oldContent) {
+        stompClient.send('/app/chat.editMessage', {}, JSON.stringify({
+            id: id,
+            content: newText.trim(),
+            channel: currentChannel
+        }));
+    }
+}
+
+function confirmDeleteMessage(id) {
+    if (confirm("Are you sure you want to delete this message?")) {
+        stompClient.send('/app/chat.deleteMessage', {}, JSON.stringify({
+            id: id,
+            channel: currentChannel
+        }));
+    }
+}
+
+/* ==========================================================================
+   3. FIXED FILE & IMAGE UPLOAD ENGINE
+   ========================================================================== */
 
 function uploadFile(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
-    fetch('http://localhost:8081/api/upload', { method: 'POST', body: formData })
+    fetch('http://localhost:8081/api/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Upload failed on server");
+        return res.json();
+    })
+    .then(data => {
+        // Construct absolute server URL so Live Server can load images from Spring Boot
+        let rawUrl = data.fileUrl || data.fileName || '';
+        let fullUrl = rawUrl.startsWith('http') 
+            ? rawUrl 
+            : `http://localhost:8081/uploads/${rawUrl.replace(/^\/?uploads\//, '')}`;
+
+        const isImage = file.type.startsWith('image/');
+        const content = isImage 
+            ? `<a href="${fullUrl}" target="_blank"><img src="${fullUrl}" alt="Attachment" /></a>`
+            : `📎 <a href="${fullUrl}" target="_blank" download>${file.name}</a>`;
+
+        stompClient.send('/app/chat.sendMessage', {}, JSON.stringify({
+            sender: currentUser.username,
+            content: content,
+            channel: currentChannel,
+            type: 'CHAT'
+        }));
+
+        // Reset file input value so user can upload same file again
+        event.target.value = '';
+    })
+    .catch(err => {
+        console.error("File upload error:", err);
+        alert("Failed to upload file. Ensure Spring Boot backend is running!");
+    });
+}
+
+function emitTyping() {
+    if (stompClient) {
+        stompClient.send('/app/chat.sendMessage', {}, JSON.stringify({
+            sender: currentUser.username,
+            channel: currentChannel,
+            type: 'TYPING'
+        }));
+    }
+}
+
+function showTypingIndicator(sender) {
+    if (sender === currentUser.username) return;
+    const indicator = document.getElementById('typing-indicator');
+    const text = document.getElementById('typing-text');
+    text.textContent = `${sender} is typing...`;
+    indicator.classList.remove('hidden');
+
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        indicator.classList.add('hidden');
+    }, 2000);
+}
+
+function loadPeopleDirectory() {
+    fetch('http://localhost:8081/api/users')
         .then(res => res.json())
-        .then(data => {
-            stompClient.send(`/app/chat.sendMessage/${activeChannelKey}`, {}, JSON.stringify({
-                sender: username,
-                content: `Shared a file: ${data.fileName}`,
-                fileUrl: data.fileUrl,
-                type: 'CHAT'
-            }));
+        .then(users => {
+            const container = document.getElementById('peopleListArea');
+            if (!container) return;
+            container.innerHTML = '';
+            users.forEach(user => {
+                if (user.username !== currentUser.username) {
+                    const roomName = [currentUser.username, user.username].sort().join('_');
+                    const html = `
+                        <div class="people-item" onclick="selectConversation('${roomName}', '${user.email || 'Direct Message'}', false)">
+                            <div class="avatar-medium">${user.username.charAt(0).toUpperCase()}</div>
+                            <div class="people-info">
+                                <h4>${user.username}</h4>
+                                <p>${user.email || 'Available'}</p>
+                            </div>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', html);
+                }
+            });
         });
 }
 
-function onMessageReceived(payload) {
-    const message = JSON.parse(payload.body);
-
-    if (message.type === 'TYPING') {
-        if (message.sender !== username) {
-            const bar = document.querySelector('#typing-indicator');
-            document.querySelector('#typing-text').textContent = `${message.sender} is typing...`;
-            bar.classList.remove('hidden');
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => bar.classList.add('hidden'), 2000);
-        }
-        return;
-    }
-
-    renderMessage(message);
+function scrollToBottom() {
+    const area = document.getElementById('messageArea');
+    if (area) area.scrollTop = area.scrollHeight;
 }
 
-function renderMessage(message) {
-    const messageArea = document.querySelector('#messageArea');
-    const el = document.createElement('li');
-
-    if (message.type === 'JOIN') {
-        el.className = 'message-item event-message';
-        el.innerHTML = `<div class="event-bubble">${message.sender} joined</div>`;
-    } else {
-        const isSelf = message.sender === username;
-        el.className = `message-item ${isSelf ? 'self' : 'other'}`;
-
-        let mediaHTML = '';
-        if (message.fileUrl) {
-            const isImg = message.fileUrl.match(/\.(jpeg|jpg|gif|png)$/i);
-            mediaHTML = isImg ? `<img src="${message.fileUrl}" style="max-width:240px; border-radius:12px; margin-top:8px;" />`
-                              : `<a href="${message.fileUrl}" target="_blank" style="color:#2563eb;"><i class="fa-solid fa-download"></i> Download File</a>`;
-        }
-
-        const displayContent = (message.content && message.content !== "null") ? message.content : '';
-
-        el.innerHTML = `
-            ${isSelf ? '' : `<span class="sender-name">${message.sender}</span>`}
-            <div class="message-bubble">
-                ${displayContent}
-                ${mediaHTML}
-                <span class="time-stamp">${message.timestamp || ''}</span>
-            </div>
-        `;
-    }
-
-    messageArea.appendChild(el);
-    messageArea.scrollTop = messageArea.scrollHeight;
+function escapeQuotes(str) {
+    return str ? str.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
 }
 
 function logout() {
-    localStorage.removeItem('chat_username');
-    localStorage.removeItem('chat_email');
-    location.reload();
+    localStorage.removeItem('pulse_workspace_user');
+    window.location.reload();
 }

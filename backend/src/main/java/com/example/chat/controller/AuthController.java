@@ -12,7 +12,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true") // <--- FIXED: Use originPatterns
 public class AuthController {
 
     @Autowired
@@ -39,7 +39,10 @@ public class AuthController {
         User user = new User(username, password, email);
         userRepository.save(user);
 
-        return ResponseEntity.ok(Map.of("message", "Registration successful! You can now log in."));
+        return ResponseEntity.ok(Map.of(
+                "message", "Registration successful! You can now log in.",
+                "username", user.getUsername(),
+                "email", user.getEmail() != null ? user.getEmail() : user.getUsername() + "@chat.com"));
     }
 
     @PostMapping("/login")
@@ -60,14 +63,14 @@ public class AuthController {
             return ResponseEntity.status(401).body(Map.of("message", "Invalid password! Please try again."));
         }
 
-        // Return email alongside username
         return ResponseEntity.ok(Map.of(
                 "message", "Login successful!",
                 "username", user.getUsername(),
                 "email", user.getEmail() != null ? user.getEmail() : user.getUsername() + "@chat.com"));
     }
 
-    @PostMapping("/forgot-password")
+    // FIXED: Mapped to /reset-password to match main.js
+    @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
         String username = request.get("username");
         String newPassword = request.get("newPassword");
