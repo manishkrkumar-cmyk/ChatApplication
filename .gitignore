@@ -1,0 +1,13 @@
+# Ignore Maven build binaries
+backend/target/
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+
+# Ignore local uploaded media files
+uploads/
+
+# Ignore IDE configuration files
+.idea/
+*.iml
+.DS_Store

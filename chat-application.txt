@@ -1,0 +1,83 @@
+🚀 Full-Stack Real-Time Workspace Chat Application
+Project Name: Pulse Workspace
+
+Tech Stack: Java, Spring Boot 3, Spring Data JPA, WebSockets (STOMP / SockJS), H2 Database, HTML5, CSS3 (Glassmorphism & Light Theme), Vanilla JavaScript (ES6+).
+
+📌 1. Project Overview & Architecture
+Pulse Workspace is a modern, full-stack, real-time collaboration and messaging platform designed with a 3-column responsive layout. It features user registration, authentication, live messaging via WebSockets, multi-channel support, private 1-on-1 chats, file sharing, and persistent session management.
+
+Key Architectural Layers:
+Presentation Layer (Frontend): Modern HTML5/CSS3 interface operating as a Single Page Application (SPA) with a dark landing page and a clean light chat workspace.
+
+Communication Layer (WebSockets): SockJS fallback with STOMP protocol over WebSockets for bi-directional, low-latency messaging.
+
+Application Layer (Backend): Spring Boot micro-services handling RESTful APIs, WebSocket mapping, and file uploads.
+
+Persistence Layer (Database): Spring Data JPA mapping entities (User, ChatMessage) to an in-memory H2 database.
+
+🛠️ 2. Comprehensive Feature Summary
+A. Authentication & Security
+Landing Homepage: Displays hero sections, platform features, and workspace guidelines before entry.
+
+User Registration: Endpoint /api/auth/register validates input rules (Username ≥ 3 chars, Password ≥ 6 chars) and prevents duplicate accounts.
+
+User Login: Endpoint /api/auth/login checks database credentials and blocks unregistered attempts with dynamic error banners.
+
+Password Reset: Endpoint /api/auth/forgot-password allows registered users to update their password.
+
+Session Persistence: Browser localStorage maintains active logins across page refreshes (F5), with complete cleanup upon explicitly clicking Logout.
+
+B. Real-Time Chat System
+Public Channels: General group broadcast channels (#general) using topic subscriptions (/topic/general).
+
+Private 1-on-1 Messaging: Dynamically generates deterministic shared room keys (e.g., sorting names alphabetically: alex_susan) so private conversations stay strictly between two users.
+
+Live Typing Indicators: Broadcasts typing states (TYPING enum) across WebSocket connections with automated 2-second timeout resets.
+
+Chat History Persistence: Automatically loads historical channel/chat logs from the database via /api/messages/{channel} upon joining a conversation.
+
+Null Safety Safeguards: Frontend sanitization to prevent blank or null database strings from rendering as broken bubbles.
+
+C. Directory & Media Capabilities
+People Directory: Rest API /api/auth/users populates the right-hand sidebar dynamically with all registered platform users.
+
+File & Image Uploads: REST controller handling MultipartFile uploads, storing assets locally under /uploads and auto-rendering image previews or download buttons in chat bubbles.
+
+🗄️ 3. Key Codebase Components & File Map
+Backend Code Structure (com.example.chat)
+Plaintext
+backend/src/main/java/com/example/chat/
+├── model/
+│   ├── User.java                # JPA Entity for user credentials & email
+│   └── ChatMessage.java         # JPA Entity for message payload, type, & room channel
+├── repository/
+│   ├── UserRepository.java      # JPA Interface for database lookups & duplicate checks
+│   └── ChatMessageRepository.java # JPA Interface for ordering chat history by ASC
+├── controller/
+│   ├── AuthController.java      # REST endpoints (/register, /login, /forgot-password, /users)
+│   ├── ChatController.java      # STOMP mappings (@MessageMapping) & chat history REST GET
+│   └── FileUploadController.java# Multipart storage & file path response generator
+└── config/
+    └── WebSocketConfig.java     # Configures STOMP endpoints (/ws) & topic brokers (/topic)
+Frontend Code Structure (frontend/)
+Plaintext
+frontend/
+├── index.html                  # Single Page Application structure (Home, Auth Modal, Chat App)
+├── css/
+│   └── style.css               # Complete styling rules (Dark Landing Page + Light 3-Column Chat UI)
+└── js/
+    └── main.js                 # WebSocket client handling, DOM manipulation, & REST API calls
+💡 4. Interview Technical Q&A Cheat-Sheet
+When presenting this project in technical interviews, be ready to answer these questions:
+
+Q1: Why did you use WebSockets instead of standard HTTP REST calls for messaging?
+Answer: Standard HTTP operates on a stateless request-response model, requiring continuous HTTP long-polling or short-polling, which causes high server overhead and network latency. WebSockets establish a single, persistent TCP connection enabling full-duplex, low-latency communication where the server can push updates instantly to clients.
+
+Q2: How does 1-on-1 private messaging work in your application?
+Answer: Instead of broadcasting to public group topics like /topic/general, the application constructs a deterministic channel key by sorting the two usernames alphabetically (e.g., userA and userB form userA_userB). Both users subscribe to this specific topic, ensuring their conversation remains isolated and private.
+
+Q3: How do you prevent UI crashes or null content bugs in chat history?
+Answer: Frontend renderer functions contain conditional checks to filter out null or undefined strings, and backend database queries order messages chronologically (findByChannelOrderByIdAsc) before returning them to the client.
+
+Q4: How is session state maintained across browser refreshes?
+Answer: Successful logins store user tokens/usernames in the browser's localStorage. Upon page load (DOMContentLoaded), an event listener checks for existing keys and bypasses the landing homepage directly to the active chat session. Clicking Logout explicitly purges the storage and resets the state.
